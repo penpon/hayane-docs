@@ -204,22 +204,6 @@ Botは3つの専用Discordチャンネルに対して、リアルタイムでロ
   - 送信者ユーザー名、Discord ID、メッセージ内容を表示
   - 日時情報を付加
 
-#### 通知チャンネルの設定
-
-環境変数で各チャンネルIDを指定します：
-
-```bash
-# .env.development または .env.production
-NORMAL_NOTIFICATION_CHANNEL_ID=123456789012345678    # 正常系通知
-ERROR_NOTIFICATION_CHANNEL_ID=234567890123456789     # 異常系通知
-DM_NOTIFICATION_CHANNEL_ID=345678901234567890        # DM系通知
-```
-
-**チャンネルIDの確認方法**:
-1. Discordで対象チャンネルを右クリック
-2. 「チャンネルIDをコピー」を選択
-3. 環境変数に貼り付け
-
 ---
 
 ## 環境分離（開発・本番）
