@@ -474,3 +474,174 @@ find ~/hayane_backup -name "*.tar.gz" -mtime +30 -delete
 ```
 
 ---
+
+## IPホワイトリスト管理
+
+### 概要
+
+IPホワイトリスト機能により、許可されたIPアドレスからのみAPIアクセスを受け付けることができます。
+
+**設定ファイル**: `ip_whitelist.json`（プロジェクトルート）
+
+### JSONファイル構造
+
+```json
+{
+  "enabled": true,
+  "whitelist": [
+    {
+      "address": "192.168.1.0/24",
+      "description": "社内ネットワーク",
+      "added_date": "2025-10-27",
+      "added_by": "admin"
+    },
+    {
+      "address": "203.0.113.10",
+      "description": "VPN接続",
+      "added_date": "2025-10-27",
+      "added_by": "admin"
+    }
+  ]
+}
+```
+
+**フィールド説明**:
+- `enabled`: ホワイトリスト機能の有効/無効（`true`/`false`）
+- `whitelist`: IPアドレスのリスト
+  - `address`: IPアドレスまたはCIDR表記（例: `192.168.1.0/24`, `::1`）
+  - `description`: 説明（任意）
+  - `added_date`: 追加日（任意）
+  - `added_by`: 追加者（任意）
+
+### IPアドレスの追加手順
+
+#### 1. Google Apps ScriptのIPアドレスを確認
+
+Google Apps Scriptは動的にIPアドレスが変わるため、広い範囲を許可する必要があります。
+
+**推奨設定**:
+```json
+{
+  "address": "0.0.0.0/0",
+  "description": "Google Apps Script (全IP許可)",
+  "added_date": "2025-10-27",
+  "added_by": "system"
+}
+```
+
+**注意**: セキュリティを強化する場合は、Googleの公開IPレンジを使用してください。
+
+#### 2. 特定のIPアドレスを追加
+
+```bash
+# ip_whitelist.jsonを編集
+nano ~/hayane/ip_whitelist.json
+
+# 新しいエントリを追加
+{
+  "address": "203.0.113.50",
+  "description": "管理者PC",
+  "added_date": "2025-10-27",
+  "added_by": "admin"
+}
+```
+
+#### 3. サービスを再起動
+
+```bash
+# 開発環境
+sudo systemctl restart hayane-dev
+
+# 本番環境
+sudo systemctl restart hayane-prod
+```
+
+### ホワイトリストの無効化
+
+一時的にホワイトリストを無効化する場合:
+
+```json
+{
+  "enabled": false,
+  "whitelist": [...]
+}
+```
+
+**注意**: 無効化すると全てのIPアドレスからのアクセスが許可されます。
+
+### トラブルシューティング
+
+#### IPホワイトリスト拒否エラーが発生する
+
+**症状**: APIアクセス時に403エラーが返される
+
+**確認事項**:
+1. アクセス元のIPアドレスを確認
+   ```bash
+   # ログを確認
+   journalctl -u hayane-prod -n 100 | grep "IPホワイトリスト拒否"
+   ```
+
+2. `ip_whitelist.json`にIPアドレスが登録されているか確認
+   ```bash
+   cat ~/hayane/ip_whitelist.json
+   ```
+
+3. CIDR表記が正しいか確認
+   - 単一IP: `192.168.1.100`
+   - ネットワーク: `192.168.1.0/24`
+   - IPv6: `2001:db8::/32`
+
+4. サービスを再起動
+   ```bash
+   sudo systemctl restart hayane-prod
+   ```
+
+#### Google Apps Scriptからのアクセスが拒否される
+
+**原因**: Google Apps ScriptのIPアドレスが動的に変わる
+
+**対処法**:
+1. 一時的に全IP許可に設定
+   ```json
+   {
+     "address": "0.0.0.0/0",
+     "description": "Google Apps Script (temporary)",
+     "added_date": "2025-10-27",
+     "added_by": "admin"
+   }
+   ```
+
+2. Googleの公開IPレンジを使用（推奨）
+   - [Google IP Ranges](https://www.gstatic.com/ipranges/goog.json)を参照
+
+### 統計情報の確認
+
+IPホワイトリスト拒否の統計は、日次統計ファイルに記録されます。
+
+```bash
+# 統計ファイルを確認
+cat ~/hayane/logs/stats/$(date +%Y-%m-%d).json | jq '.ip_whitelist_failures'
+```
+
+**出力例**:
+```json
+{
+  "192.168.1.100|||UnknownAgent/1.0": {
+    "count": 5,
+    "endpoints": {
+      "/api/execute-bot": 3,
+      "/api/stop-bot": 2
+    }
+  }
+}
+```
+
+### セキュリティのベストプラクティス
+
+1. **最小権限の原則**: 必要最小限のIPアドレスのみを許可
+2. **定期的な見直し**: 不要になったIPアドレスは削除
+3. **ログの監視**: IPホワイトリスト拒否ログを定期的に確認
+4. **Bearer Token認証との併用**: IPホワイトリストとBearer Token認証の両方を有効化
+
+---
